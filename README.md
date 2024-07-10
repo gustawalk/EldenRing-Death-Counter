@@ -18,5 +18,17 @@ English: "en"
 <br>
 Portuguese: "br"
 
+### Keybinds
+
+Text color list: ['red', 'blue', 'yellow', 'black', 'cyan', 'gray', 'white', 'purple']
+- **+ (Numpad)** : Increase text size
+- **- (Numpad)** : Decrase text size
+- **Insert**: Manually add one death to the counter
+- **Delete**: Manually remove one death from the counter 
+- **PageUp**: Go to the next color in the color list
+- **PageDown**: Go to the previous color in the color list
+- **F7**: Reset settings to default
+- **F11**: Close the application
+
 # Setup
 Created with Pyinstaller to build into an exe and Inno Setup Compiller to make the setup. The setup is very simple, just follow the steps that wizard will ask, then you can run it!

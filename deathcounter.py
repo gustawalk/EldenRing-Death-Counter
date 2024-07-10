@@ -13,7 +13,6 @@ import cv2
 import os
 import json
 
-user = os.getlogin()
 path = "C:/DeathCounter/"
 filename = "config.json"
 fullpath = f"{path}{filename}"
@@ -21,7 +20,6 @@ fullpath = f"{path}{filename}"
 def read_json(filepath):
     try:
         with open(filepath, 'r') as file:
-            print('leu')
             data = json.load(file)
     except FileNotFoundError:
         data = []
@@ -40,10 +38,8 @@ def search_data_json(filepath):
 
 def create_json():
     if os.path.exists(fullpath):
-        print('existe')
         return
-    
-    print('nao existe')
+
     if not os.path.exists(path):
         os.makedirs(path)
     
@@ -57,8 +53,6 @@ def create_json():
     with open(fullpath, 'w') as file:
         json.dump(data, file)
 
-    print("criou json")
-
 def update_json(filepath, count, size, color, language):
     data = {
         'deaths': int(count),
@@ -68,7 +62,6 @@ def update_json(filepath, count, size, color, language):
     }
     
     with open(filepath, 'w') as file:
-        print('atualizou o json')
         json.dump(data, file)
 
 def reset_json(filepath, language):
@@ -80,7 +73,6 @@ def reset_json(filepath, language):
     }
     
     with open(filepath, 'w') as file:
-        print('resetou json')
         json.dump(data, file)
 
 class MainWindow(QMainWindow):
@@ -143,7 +135,6 @@ class MainWindow(QMainWindow):
         screen = f"death_screen_{self.language}.jpg"
 
         while True:
-            
             death_screen_image = cv2.imread(screen, cv2.IMREAD_ANYCOLOR)
             screenshot = pyag.screenshot()
             screenshot = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
@@ -151,7 +142,6 @@ class MainWindow(QMainWindow):
 
             _, max_val, _, _ = cv2.minMaxLoc(result)
 
-            print(f"{max_val} on {screen}")
             if max_val > 0.55:
                 self.deaths += 1
                 self.update_deathcounter()
@@ -172,27 +162,22 @@ class MainWindow(QMainWindow):
     def on_press(self, key):
         try:
             if key.char == '-':
-                print("diminuiu o tamanho")
                 if self.deathsize > 5:
                     self.deathsize -= 5
                     self.update_deathstyle()
                     time.sleep(0.01)  
             elif key.char == '+':
-                print("aumentou o tamanho")
                 self.deathsize += 5
                 self.update_deathstyle()
                 time.sleep(0.01)
         except AttributeError:
             if key == pynput.keyboard.Key.insert:
-                print("aumentou morte")
                 self.deaths += 1
                 self.update_deathcounter()
             elif key == pynput.keyboard.Key.delete:
-                print("diminuiu morte")
                 self.deaths -= 1
                 self.update_deathcounter()
             elif key == pynput.keyboard.Key.page_up:
-                print("mudou a cor")
                 if self.count < len(self.colors)-1:
                     self.count += 1
                 else:
@@ -200,7 +185,6 @@ class MainWindow(QMainWindow):
                 self.deathcolor = self.colors[self.count]
                 self.update_deathstyle()
             elif key == pynput.keyboard.Key.page_down:
-                print("mudou a cor")
                 if self.count > 0:
                     self.count -= 1
                 else:
