@@ -159,7 +159,10 @@ class MainWindow(QMainWindow):
             time.sleep(0.25)
 
     def update_deathcounter(self):
-        self.text.setText(f"Mortes: {self.deaths}")
+        if self.language == 'br':
+            self.text.setText(f"Mortes: {self.deaths}")
+        elif self.language == 'en':
+            self.text.setText(f"Deaths: {self.deaths}")
         update_json(fullpath, self.deaths, self.deathsize, self.count, self.language)
     
     def update_deathstyle(self):
