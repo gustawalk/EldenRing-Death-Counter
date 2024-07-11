@@ -7,16 +7,17 @@ Project made with Python that automatically check if the player died based on th
 - Add more languages support
 - Better way to change the main language
 - Support to more resolutions
+- Easier way to change settings
 
 ## How to use
-You can follow the Setup area or clone this repo and install all the required libs, when you run the file for the first time will be created a config.json in **C:/DeathCounter/**, if your game is running on a language different from default (en), 
+You can follow the Setup area or clone this repo and install all the required libs, when you run the file for the first time will be created a config.json in **C:/Users/(your user)/EldenRingCounter/** in Windows and **~/EldenRingCounter** in Linux based systems, if your game is running on a language different from default (en-us), 
 you can change it by going to config file and changing the language
 
 ### Supported languages
 
-English: "en"
+English: "en-us"
 <br>
-Portuguese: "br"
+Portuguese: "pt-br"
 
 ### Keybinds
 

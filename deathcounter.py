@@ -12,10 +12,12 @@ import numpy as np
 import cv2
 import os
 import json
+from pathlib import Path
 
-path = "C:/DeathCounter/"
-filename = "config.json"
-fullpath = f"{path}{filename}"
+home = Path.home()
+path = f"{home}/EldenRingCounter/"
+config_file = "config.json"
+language_file = "lang.json"
 
 def read_json(filepath):
     try:
@@ -31,27 +33,50 @@ def append_json(filepath, entry):
     with open(filepath, 'w') as file:
         json.dump(data, file)
 
-def search_data_json(filepath):
+def search_data_json(filepath, filename, language=""):
     data = read_json(filepath)
     
-    return data['deaths'], data['text_size'], data['text_color'], data['language']
+    if filename == "config":
+        return data['deaths'], data['text_size'], data['text_color'], data['language']
+    elif filename == "language":
+        if language == "pt-br":
+            return data['pt-br']['main_text']
+        elif language == "en-us":
+            return data['en-us']['main_text']
 
-def create_json():
-    if os.path.exists(fullpath):
-        return
+
+def create_json(filepath, filename):
 
     if not os.path.exists(path):
-        os.makedirs(path)
-    
-    data = {
-        'deaths': 0,
-        'text_size': 45,
-        'text_color': 0,
-        'language': 'en'
-    }
-    
-    with open(fullpath, 'w') as file:
-        json.dump(data, file)
+        os.mkdir(path)
+
+    if filename == "config":
+        if os.path.exists(filepath):
+            return
+        data = {
+            'deaths': 0,
+            'text_size': 45,
+            'text_color': 0,
+            'language': 'en-us'
+        }
+        
+        with open(filepath, 'w') as file:
+            json.dump(data, file)
+    elif filename == "language":
+        if os.path.exists(filepath):
+            return
+        data = {
+                "pt-br": {
+                    "main_text": "Mortes: "
+                },
+                "en-us": {
+                    "main_text": "Deaths: "
+                }
+            }
+
+        with open(filepath, 'w') as file:
+            json.dump(data, file)
+
 
 def update_json(filepath, count, size, color, language):
     data = {
@@ -76,7 +101,6 @@ def reset_json(filepath, language):
         json.dump(data, file)
 
 class MainWindow(QMainWindow):
-
     def __init__(self, aw=200, ah=30):
         super().__init__()
 
@@ -104,30 +128,25 @@ class MainWindow(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
-        if os.path.exists(fullpath):
-            death_count, text_size, text_color, language = search_data_json(fullpath)
-        else:
-            death_count = 0
-            text_size = 45
-            text_color = 0
-            language = 'en'
+
+        death_count, text_size, text_color, language = search_data_json(f"{path}/{config_file}", "config")
+
+        lang_text = search_data_json(f"{path}/{language_file}", "language", language)
 
         self.overlay_priority = True
         self.language = language
+        self.lang_text = lang_text
         self.colors = ['white', 'blue', 'yellow', 'black', 'cyan', 'gray', 'red', 'purple']
-        self.count = text_color
+        self.colorindex = text_color
         self.deaths = death_count
-        self.deathsize = text_size
-        self.deathcolor = self.colors[self.count]
+        self.textsize = text_size
+        self.deathcolor = self.colors[self.colorindex]
         self.defaultstyle = "font-weight: 800;"
 
         self.layout = QVBoxLayout(central_widget)
         self.text = QLabel()
-        if self.language == 'en':
-            self.text.setText(f"Deaths: {self.deaths}")
-        elif self.language == 'br':
-            self.text.setText(f"Mortes: {self.deaths}")
-        self.text.setStyleSheet(f"font-size: {self.deathsize}px; {self.defaultstyle} color: {self.deathcolor}")
+        self.text.setText(f"{self.lang_text}{self.deaths}")
+        self.text.setStyleSheet(f"font-size: {self.textsize}px; {self.defaultstyle} color: {self.deathcolor}")
         self.layout.addWidget(self.text)
     
         threading.Thread(target=self.keyboard_listener, daemon=True).start()
@@ -144,23 +163,19 @@ class MainWindow(QMainWindow):
             result = cv2.matchTemplate(screenshot, death_screen_image, cv2.TM_CCOEFF_NORMED)
 
             _, max_val, _, _ = cv2.minMaxLoc(result)
-
-            if max_val > 0.55:
+            if max_val > 0.6:
                 self.deaths += 1
                 self.update_deathcounter()
                 time.sleep(2)
             time.sleep(0.25)
 
     def update_deathcounter(self):
-        if self.language == 'br':
-            self.text.setText(f"Mortes: {self.deaths}")
-        elif self.language == 'en':
-            self.text.setText(f"Deaths: {self.deaths}")
-        update_json(fullpath, self.deaths, self.deathsize, self.count, self.language)
+        self.text.setText(f"{self.lang_text}{self.deaths}")
+        update_json(f"{path}/{config_file}", self.deaths, self.textsize, self.colorindex, self.language)
     
     def update_deathstyle(self):
-        self.text.setStyleSheet(f"font-size: {self.deathsize}px; {self.defaultstyle} color: {self.deathcolor}")
-        update_json(fullpath, self.deaths, self.deathsize, self.count, self.language)
+        self.text.setStyleSheet(f"font-size: {self.textsize}px; {self.defaultstyle} color: {self.deathcolor}")
+        update_json(f"{path}/{config_file}", self.deaths, self.textsize, self.colorindex, self.language)
 
     def change_priority(self):
         self.overlay_priority = not self.overlay_priority
@@ -185,7 +200,6 @@ class MainWindow(QMainWindow):
             self.show()
             self.showNormal()
             self.showMinimized()
-        
 
     def on_press(self, key):
 
@@ -198,12 +212,12 @@ class MainWindow(QMainWindow):
         if self.alt_pressed:
             try:
                 if key.char == '-':
-                    if self.deathsize > 5:
-                        self.deathsize -= 5
+                    if self.textsize > 5:
+                        self.textsize -= 5
                         self.update_deathstyle()
                         time.sleep(0.01)  
                 elif key.char == '+':
-                    self.deathsize += 5
+                    self.textsize += 5
                     self.update_deathstyle()
                     time.sleep(0.01)
             except AttributeError:
@@ -214,24 +228,24 @@ class MainWindow(QMainWindow):
                     self.deaths -= 1
                     self.update_deathcounter()
                 elif key == pynput.keyboard.Key.page_up:
-                    if self.count < len(self.colors)-1:
-                        self.count += 1
+                    if self.colorindex < len(self.colors)-1:
+                        self.colorindex += 1
                     else:
-                        self.count = 0
-                    self.deathcolor = self.colors[self.count]
+                        self.colorindex = 0
+                    self.deathcolor = self.colors[self.colorindex]
                     self.update_deathstyle()
                 elif key == pynput.keyboard.Key.page_down:
-                    if self.count > 0:
-                        self.count -= 1
+                    if self.colorindex > 0:
+                        self.colorindex -= 1
                     else:
-                        self.count = len(self.colors)-1
-                    self.deathcolor = self.colors[self.count]
+                        self.colorindex = len(self.colors)-1
+                    self.deathcolor = self.colors[self.colorindex]
                     self.update_deathstyle()
                 elif key == pynput.keyboard.Key.f7:
-                    reset_json(fullpath, self.leaveEvent)
-                    self.count = 0
+                    reset_json(f"{path}/{config_file}", self.leaveEvent)
+                    self.colorindex = 0
                     self.deaths = 0
-                    self.deathsize = 45
+                    self.textsize = 45
                     self.update_deathstyle()
                     self.update_deathcounter()
                 elif key == pynput.keyboard.Key.end:
@@ -257,7 +271,8 @@ class MainWindow(QMainWindow):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    create_json()
+    create_json(f"{path}/{config_file}", "config")
+    create_json(f"{path}/{language_file}", "language")
     window = MainWindow()
     window.show()
     sys.exit(app.exec_())
