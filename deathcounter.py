@@ -93,6 +93,8 @@ class MainWindow(QMainWindow):
             Qt.FramelessWindowHint
         )
 
+        self.alt_pressed = False
+
         self.setWindowTitle("Elden Ring Death Counter")
 
         self.setAttribute(Qt.WA_TranslucentBackground)
@@ -110,8 +112,9 @@ class MainWindow(QMainWindow):
             text_color = 0
             language = 'en'
 
+        self.overlay_priority = True
         self.language = language
-        self.colors = ['red', 'blue', 'yellow', 'black', 'cyan', 'gray', 'white', 'purple']
+        self.colors = ['white', 'blue', 'yellow', 'black', 'cyan', 'gray', 'red', 'purple']
         self.count = text_color
         self.deaths = death_count
         self.deathsize = text_size
@@ -159,50 +162,87 @@ class MainWindow(QMainWindow):
         self.text.setStyleSheet(f"font-size: {self.deathsize}px; {self.defaultstyle} color: {self.deathcolor}")
         update_json(fullpath, self.deaths, self.deathsize, self.count, self.language)
 
+    def change_priority(self):
+        self.overlay_priority = not self.overlay_priority
+
+        if self.overlay_priority:
+            self.setWindowFlags(
+                Qt.Window |
+                Qt.WindowTitleHint |
+                Qt.CustomizeWindowHint |
+                Qt.WindowStaysOnTopHint |
+                Qt.FramelessWindowHint
+            )
+            self.show()
+            self.showNormal()
+        else:
+            self.setWindowFlags(
+                Qt.Window |
+                Qt.WindowTitleHint |
+                Qt.CustomizeWindowHint |
+                Qt.FramelessWindowHint
+            )   
+            self.show()
+            self.showNormal()
+            self.showMinimized()
+        
+
     def on_press(self, key):
-        try:
-            if key.char == '-':
-                if self.deathsize > 5:
-                    self.deathsize -= 5
+
+        if key == pynput.keyboard.Key.alt_l:
+            if self.alt_pressed == False:
+                self.alt_pressed = True
+            else:
+                return
+
+        if self.alt_pressed:
+            try:
+                if key.char == '-':
+                    if self.deathsize > 5:
+                        self.deathsize -= 5
+                        self.update_deathstyle()
+                        time.sleep(0.01)  
+                elif key.char == '+':
+                    self.deathsize += 5
                     self.update_deathstyle()
-                    time.sleep(0.01)  
-            elif key.char == '+':
-                self.deathsize += 5
-                self.update_deathstyle()
-                time.sleep(0.01)
-        except AttributeError:
-            if key == pynput.keyboard.Key.insert:
-                self.deaths += 1
-                self.update_deathcounter()
-            elif key == pynput.keyboard.Key.delete:
-                self.deaths -= 1
-                self.update_deathcounter()
-            elif key == pynput.keyboard.Key.page_up:
-                if self.count < len(self.colors)-1:
-                    self.count += 1
-                else:
+                    time.sleep(0.01)
+            except AttributeError:
+                if key == pynput.keyboard.Key.insert:
+                    self.deaths += 1
+                    self.update_deathcounter()
+                elif key == pynput.keyboard.Key.delete:
+                    self.deaths -= 1
+                    self.update_deathcounter()
+                elif key == pynput.keyboard.Key.page_up:
+                    if self.count < len(self.colors)-1:
+                        self.count += 1
+                    else:
+                        self.count = 0
+                    self.deathcolor = self.colors[self.count]
+                    self.update_deathstyle()
+                elif key == pynput.keyboard.Key.page_down:
+                    if self.count > 0:
+                        self.count -= 1
+                    else:
+                        self.count = len(self.colors)-1
+                    self.deathcolor = self.colors[self.count]
+                    self.update_deathstyle()
+                elif key == pynput.keyboard.Key.f7:
+                    reset_json(fullpath, self.leaveEvent)
                     self.count = 0
-                self.deathcolor = self.colors[self.count]
-                self.update_deathstyle()
-            elif key == pynput.keyboard.Key.page_down:
-                if self.count > 0:
-                    self.count -= 1
-                else:
-                    self.count = len(self.colors)-1
-                self.deathcolor = self.colors[self.count]
-                self.update_deathstyle()
-            elif key == pynput.keyboard.Key.f7:
-                reset_json(fullpath, self.leaveEvent)
-                self.count = 0
-                self.deaths = 0
-                self.deathsize = 45
-                self.update_deathstyle()
-                self.update_deathcounter()
-            elif key == pynput.keyboard.Key.f11:
-                window.close()
+                    self.deaths = 0
+                    self.deathsize = 45
+                    self.update_deathstyle()
+                    self.update_deathcounter()
+                elif key == pynput.keyboard.Key.end:
+                    self.change_priority()
+                elif key == pynput.keyboard.Key.f11:
+                    window.close()
         return
     
     def on_release(self, key):
+        if key == pynput.keyboard.Key.alt_l:
+            self.alt_pressed = False
         return
 
     def keyboard_listener(self):

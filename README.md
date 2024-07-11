@@ -20,14 +20,18 @@ Portuguese: "br"
 
 ### Keybinds
 
-Text color list: ['red', 'blue', 'yellow', 'black', 'cyan', 'gray', 'white', 'purple']
+Text color list: ['white', 'blue', 'yellow', 'black', 'cyan', 'gray', 'red', 'purple']
+
+#### You need to hold ALT so the keybinds work
+*Example: ALT + Insert*
 - **+ (Numpad)** : Increase text size
 - **- (Numpad)** : Decrase text size
 - **Insert**: Manually add one death to the counter
 - **Delete**: Manually remove one death from the counter 
 - **PageUp**: Go to the next color in the color list
 - **PageDown**: Go to the previous color in the color list
-- **F7**: Reset settings to default
+- **End**: Switch the overlay priority
+- **F7**: Reset settings to default (Your deaths aswell)
 - **F11**: Close the application
 
 # Setup
