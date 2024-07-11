@@ -128,14 +128,13 @@ class MainWindow(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
-
         death_count, text_size, text_color, language = search_data_json(f"{path}/{config_file}", "config")
 
-        lang_text = search_data_json(f"{path}/{language_file}", "language", language)
+        main_text = search_data_json(f"{path}/{language_file}", "language", language)
 
         self.overlay_priority = True
         self.language = language
-        self.lang_text = lang_text
+        self.main_text = main_text
         self.colors = ['white', 'blue', 'yellow', 'black', 'cyan', 'gray', 'red', 'purple']
         self.colorindex = text_color
         self.deaths = death_count
@@ -145,7 +144,7 @@ class MainWindow(QMainWindow):
 
         self.layout = QVBoxLayout(central_widget)
         self.text = QLabel()
-        self.text.setText(f"{self.lang_text}{self.deaths}")
+        self.text.setText(f"{self.main_text}{self.deaths}")
         self.text.setStyleSheet(f"font-size: {self.textsize}px; {self.defaultstyle} color: {self.deathcolor}")
         self.layout.addWidget(self.text)
     
@@ -170,7 +169,7 @@ class MainWindow(QMainWindow):
             time.sleep(0.25)
 
     def update_deathcounter(self):
-        self.text.setText(f"{self.lang_text}{self.deaths}")
+        self.text.setText(f"{self.main_text}{self.deaths}")
         update_json(f"{path}/{config_file}", self.deaths, self.textsize, self.colorindex, self.language)
     
     def update_deathstyle(self):
@@ -202,7 +201,6 @@ class MainWindow(QMainWindow):
             self.showMinimized()
 
     def on_press(self, key):
-
         if key == pynput.keyboard.Key.alt_l:
             if self.alt_pressed == False:
                 self.alt_pressed = True
@@ -242,7 +240,7 @@ class MainWindow(QMainWindow):
                     self.deathcolor = self.colors[self.colorindex]
                     self.update_deathstyle()
                 elif key == pynput.keyboard.Key.f7:
-                    reset_json(f"{path}/{config_file}", self.leaveEvent)
+                    reset_json(f"{path}/{config_file}", self.language)
                     self.colorindex = 0
                     self.deaths = 0
                     self.textsize = 45
