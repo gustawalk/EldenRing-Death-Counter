@@ -7,12 +7,16 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 import time
 import threading
-import pyautogui as pyag
 import numpy as np
 import cv2
-import os
 import json
 from pathlib import Path
+import mss
+import mss.tools
+from functools import partial
+from screeninfo import get_monitors
+import ctypes.wintypes
+
 
 home = Path.home()
 path = f"{home}/EldenRingCounter/"
@@ -37,13 +41,16 @@ def search_data_json(filepath, filename, language=""):
     data = read_json(filepath)
     
     if filename == "config":
-        return data['deaths'], data['text_size'], data['text_color'], data['language']
+        return data['deaths'], data['text_size'], data['text_color'], data['language'], data['monitor']
     elif filename == "language":
         if language == "pt-br":
-            return data['pt-br']['main_text']
+            return data['pt-br']['main_text'], data['pt-br']['select_screen'], data['pt-br']['select_language'], data['pt-br']['change_main_text'], data['pt-br']['continue_text']
         elif language == "en-us":
-            return data['en-us']['main_text']
+            return data['en-us']['main_text'], data['en-us']['select_screen'], data['en-us']['select_language'], data['en-us']['change_main_text'], data['en-us']['continue_text']
 
+def search_size_json(filepath):
+    data = read_json(filepath)
+    return data
 
 def create_json(filepath, filename):
 
@@ -57,7 +64,8 @@ def create_json(filepath, filename):
             'deaths': 0,
             'text_size': 45,
             'text_color': 0,
-            'language': 'en-us'
+            'language': 'en-us',
+            'monitor': 0
         }
         
         with open(filepath, 'w') as file:
@@ -67,27 +75,56 @@ def create_json(filepath, filename):
             return
         data = {
                 "pt-br": {
-                    "main_text": "Mortes: "
+                    "main_text": "Mortes: ",
+                    "select_screen": "Escolha o monitor: ",
+                    "select_language": "Escolha o idoma do Elden Ring: ",
+                    "change_main_text": "Altere o texto antes do contador: ",
+                    "continue_text": "Continuar"
                 },
                 "en-us": {
-                    "main_text": "Deaths: "
+                    "main_text": "Deaths: ",
+                    "select_screen": "Select the monitor: ",
+                    "select_language": "Select Elden Ring language: ",
+                    "change_main_text": "Change the text before the counter: ",
+                    "continue_text": "Continue"
                 }
-            }
+        }
 
         with open(filepath, 'w') as file:
             json.dump(data, file)
 
+def update_json(filepath, count=0, size=0, color=0, language="", main_monitor=0, main_text="", filename=""):
+    if filename == "config":
+        data = {
+            'deaths': int(count),
+            'text_size': int(size),
+            'text_color': int(color),
+            'language': str(language),
+            'monitor': int(main_monitor)
+        }
+        
+        with open(filepath, 'w') as file:
+            json.dump(data, file)
+    elif filename == "language":
+        data = {
+            "pt-br": {
+                "main_text": main_text,
+                "select_screen": "Escolha o monitor: ",
+                "select_language": "Escolha o idoma do Elden Ring: ",
+                "change_main_text": "Altere o texto antes do contador: ",
+                "continue_text": "Continuar"
+            },
+            "en-us": {
+                "main_text": main_text,
+                "select_screen": "Select the monitor: ",
+                "select_language": "Select Elden Ring language: ",
+                "change_main_text": "Change the text before the counter: ",
+                "continue_text": "Continue"
+            }
+        }
 
-def update_json(filepath, count, size, color, language):
-    data = {
-        'deaths': int(count),
-        'text_size': int(size),
-        'text_color': int(color),
-        'language': str(language)
-    }
-    
-    with open(filepath, 'w') as file:
-        json.dump(data, file)
+        with open(filepath, 'w') as file:
+            json.dump(data, file)
 
 def reset_json(filepath, language):
     data = {
@@ -100,6 +137,14 @@ def reset_json(filepath, language):
     with open(filepath, 'w') as file:
         json.dump(data, file)
 
+def get_monitor_info(monitor_number):
+    monitors = get_monitors()
+
+    if monitor_number < len(monitors):
+        return monitors[monitor_number]
+    else:
+        raise ValueError(f"Monitor with index {monitor_number} does not exist.")
+    
 class MainWindow(QMainWindow):
     def __init__(self, aw=200, ah=30):
         super().__init__()
@@ -120,6 +165,8 @@ class MainWindow(QMainWindow):
         self.alt_pressed = False
 
         self.setWindowTitle("Elden Ring Death Counter")
+        
+        self.setWindowIcon(QIcon('icon.ico'))
 
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setStyleSheet("background: transparent;")
@@ -128,9 +175,10 @@ class MainWindow(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
-        death_count, text_size, text_color, language = search_data_json(f"{path}/{config_file}", "config")
+        death_count, text_size, text_color, language, monitor = search_data_json(f"{path}/{config_file}", "config")
+        main_text, _, _, _, _ = search_data_json(f"{path}/{language_file}", "language", language)
 
-        main_text = search_data_json(f"{path}/{language_file}", "language", language)
+        self.main_monitor = monitor
 
         self.overlay_priority = True
         self.language = language
@@ -152,17 +200,46 @@ class MainWindow(QMainWindow):
 
         threading.Thread(target=self.screen_listener, daemon=True).start()
 
+    
     def screen_listener(self):
         screen = f"death_screen_{self.language}.jpg"
 
-        while True:
-            death_screen_image = cv2.imread(screen, cv2.IMREAD_ANYCOLOR)
-            screenshot = pyag.screenshot()
-            screenshot = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
-            result = cv2.matchTemplate(screenshot, death_screen_image, cv2.TM_CCOEFF_NORMED)
+        monitor = get_monitor_info(self.main_monitor)
+        sct = mss.mss()
 
+        monitor_region = {
+            "left": monitor.x,
+            "top": monitor.y,
+            "width": monitor.width,
+            "height": monitor.height
+        }
+
+        while True:
+            death_screen_image = cv2.imread(screen, cv2.IMREAD_COLOR)
+            
+            if death_screen_image.dtype != np.uint8:
+                death_screen_image = cv2.convertScaleAbs(death_screen_image)
+            
+            monitor_region = {
+                "left": monitor.x,
+                "top": monitor.y,
+                "width": monitor.width,
+                "height": monitor.height
+            }
+            
+            screenshot = sct.grab(monitor_region)
+            
+            screenshot = np.array(screenshot)
+            screenshot = cv2.cvtColor(screenshot, cv2.COLOR_BGRA2BGR)
+            
+            if screenshot.dtype != np.uint8:
+                screenshot = cv2.convertScaleAbs(screenshot)
+        
+            result = cv2.matchTemplate(screenshot, death_screen_image, cv2.TM_CCOEFF_NORMED)
+            
             _, max_val, _, _ = cv2.minMaxLoc(result)
-            if max_val > 0.6:
+
+            if max_val > 0.55:
                 self.deaths += 1
                 self.update_deathcounter()
                 time.sleep(2)
@@ -170,11 +247,11 @@ class MainWindow(QMainWindow):
 
     def update_deathcounter(self):
         self.text.setText(f"{self.main_text}{self.deaths}")
-        update_json(f"{path}/{config_file}", self.deaths, self.textsize, self.colorindex, self.language)
+        update_json(f"{path}/{config_file}", self.deaths, self.textsize, self.colorindex, self.language, filename='config')
     
     def update_deathstyle(self):
         self.text.setStyleSheet(f"font-size: {self.textsize}px; {self.defaultstyle} color: {self.deathcolor}")
-        update_json(f"{path}/{config_file}", self.deaths, self.textsize, self.colorindex, self.language)
+        update_json(f"{path}/{config_file}", self.deaths, self.textsize, self.colorindex, self.language, filename='config')
 
     def change_priority(self):
         self.overlay_priority = not self.overlay_priority
@@ -249,7 +326,7 @@ class MainWindow(QMainWindow):
                 elif key == pynput.keyboard.Key.end:
                     self.change_priority()
                 elif key == pynput.keyboard.Key.f11:
-                    window.close()
+                    self.close()
         return
     
     def on_release(self, key):
@@ -267,10 +344,130 @@ class MainWindow(QMainWindow):
         xx, yy = self.mouse.position
         self.move(int(xx), int(yy))
 
+class ConfigWindow(QDialog):
+    saveConfigSignal = pyqtSignal()
+
+    def __init__(self, aw, ah):
+        super().__init__()
+
+        self.setWindowTitle("ER Counter Configuration")
+        self.setWindowIcon(QIcon('icon.ico'))
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+
+        self.aw = aw
+        self.ah = ah
+
+        self.death, self.text_size, self.text_color, self.language, self.main_monitor = search_data_json(f"{path}/{config_file}", "config")
+        self.main_monitor_name = get_monitor_info(self.main_monitor)
+
+        main_text, select_screen, select_language, change_main_text, continue_text = search_data_json(f"{path}/{language_file}", "language", self.language)
+
+        view = QApplication.desktop().screenGeometry()
+        scr_width = int((view.width() / 2) - (aw / 2))
+        scr_height = int((view.height() / 2) - (ah / 2))
+        self.setGeometry(scr_width, scr_height, aw, ah)
+
+        self.layout = QFormLayout()
+        
+        self.select_monitor = QLabel(select_screen)
+        self.layout.addWidget(self.select_monitor)
+
+        self.monitor_group = QButtonGroup()
+        for monitor in get_monitors():
+            self.monitors = QRadioButton(f"{monitor.name}")
+            self.monitors.clicked.connect(partial(self.radio_monitor_button_clicked, monitor.name))
+            self.layout.addWidget(self.monitors)
+            self.monitor_group.addButton(self.monitors)
+
+            if monitor.name == self.main_monitor_name.name:
+                self.monitors.setChecked(True)
+
+        self.select_language = QLabel(select_language)
+        self.layout.addWidget(self.select_language)
+
+        lang_options = search_size_json(f"{path}/{language_file}")
+
+        self.language_group = QButtonGroup()
+        for lang in lang_options:
+            self.languages = QRadioButton(f"{lang}")
+            self.languages.clicked.connect(partial(self.radio_lang_button_clicked, lang))
+            self.layout.addWidget(self.languages)
+            self.language_group.addButton(self.languages)
+
+            if lang == self.language:
+                self.languages.setChecked(True)
+
+        self.change_maintext = QLabel(change_main_text)
+        self.layout.addWidget(self.change_maintext)
+
+        self.maintext_area = QTextEdit(main_text)
+        self.maintext_area.setStyleSheet("max-height: 30px;")
+        self.layout.addWidget(self.maintext_area)
+
+        self.save_button = QPushButton(continue_text)
+        self.save_button.clicked.connect(self.update_all_config)
+        self.layout.addWidget(self.save_button)
+
+        self.setLayout(self.layout)
+
+        quit = QAction("Quit", self)
+        quit.triggered.connect(self.close)
+
+    def radio_lang_button_clicked(self, language):
+        self.update_main_language(language)
+    
+    def update_main_language(self, language):
+        update_json(f"{path}/{config_file}", self.death, self.text_size, self.text_color, language, self.main_monitor, filename='config')
+        self.language = language
+        main_text, select_screen, select_language, change_main_text, continue_text = search_data_json(f"{path}/{language_file}", "language", language)
+
+        self.select_monitor.setText(select_screen)
+        self.select_language.setText(select_language)
+        self.change_maintext.setText(change_main_text)
+        self.maintext_area.setText(main_text)
+        self.save_button.setText(continue_text)
+
+    def radio_monitor_button_clicked(self, name):
+        self.update_main_monitor(name)
+
+    def update_main_monitor(self, name):
+        name = name[11:]
+        name = int(name)
+        name = name-1
+        self.main_monitor = name
+    
+    def update_all_config(self):
+        main_text, _, _, _, _ = search_data_json(f"{path}/{language_file}", "language", self.language)
+        new_main_text = self.maintext_area.toPlainText()
+
+        if new_main_text != main_text:
+            update_json(f"{path}/{language_file}", main_text= new_main_text, filename="language")
+
+        update_json(f"{path}/{config_file}", self.death, self.text_size, self.text_color, self.language, self.main_monitor, filename="config")
+
+        self.saveConfigSignal.emit()
+        self.close()
+
+class Application(QApplication):
+    def __init__(self, *args):
+        super().__init__(*args)
+
+        self.create_initial_config_files()
+
+        self.config_window = ConfigWindow(300, 300)
+        self.config_window.show()
+
+        self.config_window.saveConfigSignal.connect(self.show_main_window)
+
+    def create_initial_config_files(self):
+        create_json(f"{path}/{config_file}", "config")
+        create_json(f"{path}/{language_file}", "language")
+
+    def show_main_window(self):
+        self.config_window.close()
+        self.main_window = MainWindow()
+        self.main_window.show()
+
 if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    create_json(f"{path}/{config_file}", "config")
-    create_json(f"{path}/{language_file}", "language")
-    window = MainWindow()
-    window.show()
+    app = Application(sys.argv)
     sys.exit(app.exec_())
