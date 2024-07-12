@@ -3,14 +3,14 @@ Project made with Python that automatically check if the player died based on th
 
 ## Plans for future updates
 - Make an executable file ✔
-- Check the save file (.sl2) directly instead using screenshot from pyautogui
+- Check the save file (.sl2) directly instead using screenshot from mss
 - Add more languages support
 - Better way to change the main language ✔
 - Support to more resolutions
 - Easier way to change settings ✔
 
 ## How to use
-You can follow the Setup area or clone this repo and install all the required libs, when you run the file for the first time will be created a config.json and language.json in **C:/Users/(your user)/EldenRingCounter/** in Windows and **~/EldenRingCounter** in Linux based systems. When you open the executable, first, will open a configuration window, then you can select in which monitor the elden ring is running, which language and the text that will apear before the death counter.
+You can follow the Setup area or clone this repo and install all the required libs, when you run the file for the first time will be created a config.json and language.json in **C:/Users/(your user)/EldenRingCounter/** in Windows and **~/EldenRingCounter** in Linux based systems. When you open the executable, first, will open a configuration window, then you can select which monitor the elden ring is running, which language and the text that will apear before the death counter.
 
 
 ### Supported languages
