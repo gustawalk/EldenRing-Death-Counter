@@ -38,3 +38,9 @@ Text color list: ['white', 'blue', 'yellow', 'black', 'cyan', 'gray', 'red', 'pu
 
 # Setup
 Created with Pyinstaller to build into an exe and Inno Setup Compiller to make the setup. The setup is very simple, just follow the steps that wizard will ask, then you can run it!
+
+# Video demonstration
+
+https://github.com/user-attachments/assets/7adb3e65-8010-4a42-8a27-328177501545
+
+
