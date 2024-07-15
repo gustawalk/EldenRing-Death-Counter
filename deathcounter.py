@@ -15,6 +15,7 @@ import mss
 import mss.tools
 from functools import partial
 from screeninfo import get_monitors
+from pygrabber.dshow_graph import FilterGraph
 import ctypes.wintypes
 
 
@@ -65,7 +66,7 @@ def create_json(filepath, filename):
             'text_size': 45,
             'text_color': 0,
             'language': 'en-us',
-            'monitor': 0
+            'monitor': "\\\\.\\DISPLAY1"
         }
         
         with open(filepath, 'w') as file:
@@ -93,14 +94,14 @@ def create_json(filepath, filename):
         with open(filepath, 'w') as file:
             json.dump(data, file)
 
-def update_json(filepath, count=0, size=0, color=0, language="", main_monitor=0, main_text="", filename=""):
+def update_json(filepath, count=0, size=0, color=0, language="", main_monitor="", main_text="", filename=""):
     if filename == "config":
         data = {
             'deaths': int(count),
             'text_size': int(size),
             'text_color': int(color),
             'language': str(language),
-            'monitor': int(main_monitor)
+            'monitor': str(main_monitor)
         }
         
         with open(filepath, 'w') as file:
@@ -131,20 +132,31 @@ def reset_json(filepath, language):
         'deaths': 0,
         'text_size': 45,
         'text_color': 0,
-        'language': str(language)
+        'language': str(language),
+        'monitor': "\\\\.\\DISPLAY1"
     }
     
     with open(filepath, 'w') as file:
         json.dump(data, file)
 
-def get_monitor_info(monitor_number):
+def get_monitor_info(monitor_name):
     monitors = get_monitors()
 
-    if monitor_number < len(monitors):
-        return monitors[monitor_number]
-    else:
-        raise ValueError(f"Monitor with index {monitor_number} does not exist.")
-    
+    for monitor in monitors:
+        if monitor.name == monitor_name:
+            return monitor
+        
+def list_video_sources():
+    graph = FilterGraph()
+    devices = graph.get_input_devices()
+    return devices
+
+def get_video_source_index(source_name):
+    video_sources = list_video_sources()
+    for i, source in enumerate(video_sources):
+        if source == source_name:
+            return i
+
 class MainWindow(QMainWindow):
     def __init__(self, aw=200, ah=30):
         super().__init__()
@@ -203,55 +215,92 @@ class MainWindow(QMainWindow):
     
     def screen_listener(self):
         screen = f"death_screen_{self.language}.jpg"
+        
+        death_screen_image = cv2.imread(screen, cv2.IMREAD_COLOR)
+        
+        if death_screen_image.dtype != np.uint8:
+            death_screen_image = cv2.convertScaleAbs(death_screen_image)
+                
 
-        monitor = get_monitor_info(self.main_monitor)
-        sct = mss.mss()
+        monitor_list = []
 
-        monitor_region = {
-            "left": monitor.x,
-            "top": monitor.y,
-            "width": monitor.width,
-            "height": monitor.height
-        }
+        for i in get_monitors():
+            monitor_list.append(i.name)
+        
+        if self.main_monitor in monitor_list:
 
-        while True:
-            death_screen_image = cv2.imread(screen, cv2.IMREAD_COLOR)
-            
-            if death_screen_image.dtype != np.uint8:
-                death_screen_image = cv2.convertScaleAbs(death_screen_image)
-            
+            monitor = get_monitor_info(self.main_monitor)
+            sct = mss.mss()
+
             monitor_region = {
                 "left": monitor.x,
                 "top": monitor.y,
                 "width": monitor.width,
                 "height": monitor.height
             }
-            
-            screenshot = sct.grab(monitor_region)
-            
-            screenshot = np.array(screenshot)
-            screenshot = cv2.cvtColor(screenshot, cv2.COLOR_BGRA2BGR)
-            
-            if screenshot.dtype != np.uint8:
-                screenshot = cv2.convertScaleAbs(screenshot)
-        
-            result = cv2.matchTemplate(screenshot, death_screen_image, cv2.TM_CCOEFF_NORMED)
-            
-            _, max_val, _, _ = cv2.minMaxLoc(result)
 
-            if max_val > 0.55:
-                self.deaths += 1
-                self.update_deathcounter()
-                time.sleep(2)
-            time.sleep(0.25)
+            while True:
+                monitor_region = {
+                    "left": monitor.x,
+                    "top": monitor.y,
+                    "width": monitor.width,
+                    "height": monitor.height
+                }
+                
+                screenshot = sct.grab(monitor_region)
+                
+                screenshot = np.array(screenshot)
+                screenshot = cv2.cvtColor(screenshot, cv2.COLOR_BGRA2BGR)
+                
+                if screenshot.dtype != np.uint8:
+                    screenshot = cv2.convertScaleAbs(screenshot)
+            
+                result = cv2.matchTemplate(screenshot, death_screen_image, cv2.TM_CCOEFF_NORMED)
+                
+                _, max_val, _, _ = cv2.minMaxLoc(result)
+
+                if max_val > 0.55:
+                    self.deaths += 1
+                    self.update_deathcounter()
+                    time.sleep(2)
+                time.sleep(0.25)
+        else:
+
+            video_source_index = get_video_source_index(self.main_monitor)
+
+            cap = cv2.VideoCapture(video_source_index)
+
+            width = 1920
+            height = 1080
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+
+            while True:
+                ret, frame = cap.read()
+
+                if not ret:
+                    break
+
+                if frame.dtype != np.uint8:
+                    frame = cv2.convertScaleAbs(frame)
+
+                result = cv2.matchTemplate(frame, death_screen_image, cv2.TM_CCOEFF_NORMED)
+
+                _, max_val, _, _ = cv2.minMaxLoc(result)
+
+                if max_val > 0.55:
+                    self.deaths += 1
+                    self.update_deathcounter()
+                    time.sleep(2)
+                time.sleep(0.25)
 
     def update_deathcounter(self):
         self.text.setText(f"{self.main_text}{self.deaths}")
-        update_json(f"{path}/{config_file}", self.deaths, self.textsize, self.colorindex, self.language, filename='config')
+        update_json(f"{path}/{config_file}", self.deaths, self.textsize, self.colorindex, self.language, self.main_monitor, filename='config')
     
     def update_deathstyle(self):
         self.text.setStyleSheet(f"font-size: {self.textsize}px; {self.defaultstyle} color: {self.deathcolor}")
-        update_json(f"{path}/{config_file}", self.deaths, self.textsize, self.colorindex, self.language, filename='config')
+        update_json(f"{path}/{config_file}", self.deaths, self.textsize, self.colorindex, self.language, self.main_monitor, filename='config')
 
     def change_priority(self):
         self.overlay_priority = not self.overlay_priority
@@ -369,7 +418,7 @@ class ConfigWindow(QDialog):
 
         self.layout = QFormLayout()
         
-        self.select_monitor = QLabel(select_screen)
+        self.select_monitor = QLabel(f"{select_screen}")
         self.layout.addWidget(self.select_monitor)
 
         self.monitor_group = QButtonGroup()
@@ -379,10 +428,25 @@ class ConfigWindow(QDialog):
             self.layout.addWidget(self.monitors)
             self.monitor_group.addButton(self.monitors)
 
-            if monitor.name == self.main_monitor_name.name:
-                self.monitors.setChecked(True)
+            try:
+                name_check = self.main_monitor_name.name
+                if monitor.name == f"{name_check}":
+                    self.monitors.setChecked(True)
+            except:
+                continue
 
-        self.select_language = QLabel(select_language)
+        video_sources = list_video_sources()
+
+        for _, sources in enumerate(video_sources):
+            self.sources = QRadioButton(f"{sources}")
+            self.sources.clicked.connect(partial(self.radio_monitor_button_clicked, sources))
+            self.layout.addWidget(self.sources)
+            self.monitor_group.addButton(self.sources)
+
+            if self.main_monitor == sources:
+                self.sources.setChecked(True)
+        
+        self.select_language = QLabel(f"<br>{select_language}")
         self.layout.addWidget(self.select_language)
 
         lang_options = search_size_json(f"{path}/{language_file}")
@@ -431,9 +495,6 @@ class ConfigWindow(QDialog):
         self.update_main_monitor(name)
 
     def update_main_monitor(self, name):
-        name = name[11:]
-        name = int(name)
-        name = name-1
         self.main_monitor = name
     
     def update_all_config(self):
