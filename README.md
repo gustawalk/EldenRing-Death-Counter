@@ -11,8 +11,7 @@ Project made with Python that automatically check if the player died based on th
 - Make it compatible with Linux based system
 
 ## How to use
-You can follow the Setup area or clone this repo and install all the required libs, when you run the file for the first time will be created a config.json and language.json in **C:/Users/(your user)/EldenRingCounter/**. When you open the executable, first, will open a configuration window, then you can select which monitor/video source the elden ring is running, which language and the text that will apear before the death counter.
-
+You can follow the Setup area or clone this repo and install all the required libs, when you run the file for the first time will be created a config.json and language.json in **C:/Users/(your user)/EldenRingCounter/**. When you compile the code or open the executable, first, will open a configuration window, there you can select which monitor/video source and the language that elden ring is running, you can also change the text before the counter (leaving it blank works aswell).
 
 ### Supported languages
 
