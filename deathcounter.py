@@ -501,11 +501,11 @@ class ConfigWindow(QDialog):
         self.language = language
         main_text, select_screen, select_language, change_main_text, continue_text = search_data_json(f"{path}/{language_file}", "language", language)
 
-        self.select_monitor.setText(select_screen)
-        self.select_language.setText(select_language)
-        self.change_maintext.setText(change_main_text)
-        self.maintext_area.setText(main_text)
-        self.save_button.setText(continue_text)
+        self.select_monitor.setText(f"{select_screen}")
+        self.select_language.setText(f"<br>{select_language}")
+        self.change_maintext.setText(f"<br>{change_main_text}")
+        self.maintext_area.setText(f"{main_text}")
+        self.save_button.setText(f"{continue_text}")
 
     def radio_monitor_button_clicked(self, name):
         self.update_main_monitor(name)
