@@ -165,6 +165,10 @@ class MainWindow(QMainWindow):
         self.ah = ah
 
         self.mouse = pynput.mouse.Controller()
+        
+        self.setMouseTracking(True)
+        self.is_dragging = False
+        self.drag_start_position = QPoint()
 
         self.setWindowFlags(
             Qt.Window |
@@ -178,7 +182,7 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("Elden Ring Death Counter")
         
-        self.setWindowIcon(QIcon('icon.ico'))
+        self.setWindowIcon(QIcon('./src/icon.ico'))
 
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setStyleSheet("background: transparent;")
@@ -214,7 +218,7 @@ class MainWindow(QMainWindow):
 
     
     def screen_listener(self):
-        screen = f"death_screen_{self.language}.jpg"
+        screen = f"./img/death_screen_{self.language}.jpg"
         
         death_screen_image = cv2.imread(screen, cv2.IMREAD_COLOR)
         
@@ -389,9 +393,21 @@ class MainWindow(QMainWindow):
             on_release=self.on_release) as kb:
                 kb.join()
 
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.is_dragging = True
+            self.drag_start_position = event.globalPos() - self.frameGeometry().topLeft()
+            event.accept()
+
     def mouseMoveEvent(self, event):
-        xx, yy = self.mouse.position
-        self.move(int(xx), int(yy))
+        if self.is_dragging:
+            self.move(event.globalPos() - self.drag_start_position)
+            event.accept()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.is_dragging = False
+            event.accept()
 
 class ConfigWindow(QDialog):
     saveConfigSignal = pyqtSignal()
@@ -400,7 +416,7 @@ class ConfigWindow(QDialog):
         super().__init__()
 
         self.setWindowTitle("ER Counter Configuration")
-        self.setWindowIcon(QIcon('icon.ico'))
+        self.setWindowIcon(QIcon('./src/icon.ico'))
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
 
         self.aw = aw
@@ -461,7 +477,7 @@ class ConfigWindow(QDialog):
             if lang == self.language:
                 self.languages.setChecked(True)
 
-        self.change_maintext = QLabel(change_main_text)
+        self.change_maintext = QLabel(f"<br>{change_main_text}")
         self.layout.addWidget(self.change_maintext)
 
         self.maintext_area = QTextEdit(main_text)
